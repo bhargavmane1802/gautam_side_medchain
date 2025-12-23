@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, forwardRef } from 'react';
 import { Box, Chip, IconButton, Typography, Paper } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
@@ -6,7 +6,8 @@ import { useDropzone } from 'react-dropzone';
 import CustomButton from '../../components/CustomButton';
 import useAlert from '../../contexts/AlertContext/useAlert';
 
-const AddRecordModal = ({ handleClose, handleUpload, patientAddress }) => {
+// Wrap the component in forwardRef to fix the MUI Modal warning
+const AddRecordModal = forwardRef(({ handleClose, handleUpload, patientAddress }, ref) => {
   const { setAlert } = useAlert();
   const [file, setFile] = useState(null);
   const [buffer, setBuffer] = useState(null);
@@ -21,6 +22,7 @@ const AddRecordModal = ({ handleClose, handleUpload, patientAddress }) => {
     const reader = new FileReader();
     reader.readAsArrayBuffer(selectedFile);
     reader.onloadend = () => {
+      // Use the global Buffer (provided by your vite-plugin-node-polyfills)
       const buf = Buffer.from(reader.result);
       setBuffer(buf);
     };
@@ -33,12 +35,15 @@ const AddRecordModal = ({ handleClose, handleUpload, patientAddress }) => {
 
   return (
     <Box
+      ref={ref} // Attach the ref here
+      tabIndex="-1" // Ensures the Box can receive focus for accessibility
       sx={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         height: '100vh',
         width: '100vw',
+        outline: 'none', // Remove focus border
       }}
     >
       <Paper
@@ -108,6 +113,6 @@ const AddRecordModal = ({ handleClose, handleUpload, patientAddress }) => {
       </Paper>
     </Box>
   );
-};
+});
 
 export default AddRecordModal;

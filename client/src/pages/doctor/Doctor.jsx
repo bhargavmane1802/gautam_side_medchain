@@ -16,8 +16,9 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import useEth from "../../contexts/EthContext/useEth";
 import useAlert from "../../contexts/AlertContext/useAlert";
 import AddRecordModal from "./AddRecordModal";
-import ipfs from "../../ipfs";
+import uploadToIPFS from "../../ipfs"; 
 import Record from "../../components/Record";
+
 
 const Doctor = () => {
   const {
@@ -73,33 +74,42 @@ const Doctor = () => {
     }
   };
 
-  const addRecordCallback = useCallback(
-    async (buffer, fileName, patientAddress) => {
-      if (!patientAddress) {
-        setAlert("Please search for a patient first", "error");
-        return;
+  // At the top of Doctor.jsx, change the import name for clarity
+
+
+// Inside the Doctor component:
+const addRecordCallback = useCallback(
+  async (buffer, fileName, patientAddress) => {
+    if (!patientAddress) {
+      setAlert("Please search for a patient first", "error");
+      return;
+    }
+    try {
+      // 1. Upload to Pinata and get the CID
+      const ipfsHash = await uploadToIPFS(buffer, fileName);
+      
+      if (ipfsHash) {
+        // 2. Save the CID to the Ethereum Blockchain
+        await contract.methods
+          .addRecord(ipfsHash, fileName, patientAddress)
+          .send({ from: accounts[0] });
+
+        setAlert("New record uploaded and secured on blockchain", "success");
+        setAddRecord(false);
+
+        // 3. Refresh the record list
+        const recs = await contract.methods
+          .getRecords(patientAddress)
+          .call({ from: accounts[0] });
+        setRecords(recs);
       }
-      try {
-        const res = await ipfs.add(buffer);
-        const ipfsHash = res[0].hash;
-        if (ipfsHash) {
-          await contract.methods
-            .addRecord(ipfsHash, fileName, patientAddress)
-            .send({ from: accounts[0] });
-          setAlert("New record uploaded", "success");
-          setAddRecord(false);
-          const recs = await contract.methods
-            .getRecords(patientAddress)
-            .call({ from: accounts[0] });
-          setRecords(recs);
-        }
-      } catch (err) {
-        console.error(err);
-        setAlert("Record upload failed", "error");
-      }
-    },
-    [accounts, contract, setAlert]
-  );
+    } catch (err) {
+      console.error(err);
+      setAlert("Record upload failed. Check console for details.", "error");
+    }
+  },
+  [accounts, contract, setAlert]
+);
 
   if (loading) {
     return (

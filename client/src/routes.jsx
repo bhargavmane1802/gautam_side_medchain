@@ -1,17 +1,15 @@
-// Guards
+import React from "react";
 import Layout from './components/layouts/Layout';
 import AlertPopup from './components/layouts/AlertPopup';
-
-// Pages
 import Home from './pages/Home';
 import Patient from './pages/patient/Patient';
 import Doctor from './pages/doctor/Doctor';
-import HeaderAppBar from './components/layouts/Layout';
 
+// Ensure this is a standard array
 const routes = [
   {
     path: '/',
-    element: <Layout />, // Optional wrapper layout
+    element: <Layout />, 
     children: [
       {
         index: true,
@@ -26,7 +24,6 @@ const routes = [
         path: 'patient',
         element: (
           <>
-            <HeaderAppBar />
             <AlertPopup />
             <Patient />
           </>
@@ -36,7 +33,6 @@ const routes = [
         path: 'doctor',
         element: (
           <>
-            <HeaderAppBar />
             <AlertPopup />
             <Doctor />
           </>
@@ -46,4 +42,4 @@ const routes = [
   },
 ];
 
-export default routes;
+export default routes; // Make sure this is the only default export
