@@ -1,6 +1,6 @@
 export const actions = {
   init: "INIT",
-  addDoctor: "ADD_DOCTOR",
+  setRole: "SET_ROLE",
 };
 
 export const initialState = {
@@ -10,7 +10,7 @@ export const initialState = {
   networkID: null,
   contract: null,
   role: "unknown",
-  loading: true,
+  loading: true, // App starts in a loading state
 };
 
 export const reducer = (state, action) => {
@@ -18,8 +18,8 @@ export const reducer = (state, action) => {
   switch (type) {
     case actions.init:
       return { ...state, ...data };
-    case actions.addDoctor:
-      return { ...state, role: "doctor" };
+    case actions.setRole:
+      return { ...state, role: data }; // Generic role update
     default:
       throw new Error(`Undefined reducer action type: ${type}`);
   }

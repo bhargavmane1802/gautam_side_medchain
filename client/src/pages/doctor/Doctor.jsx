@@ -19,7 +19,6 @@ import AddRecordModal from "./AddRecordModal";
 import uploadToIPFS from "../../ipfs"; 
 import Record from "../../components/Record";
 
-
 const Doctor = () => {
   const {
     state: { contract, accounts, role, loading },
@@ -41,19 +40,22 @@ const Doctor = () => {
       const exists = await contract.methods
         .getPatientExists(searchPatientAddress)
         .call({ from: accounts[0] });
+        
       if (exists) {
         const recs = await contract.methods
           .getRecords(searchPatientAddress)
           .call({ from: accounts[0] });
         setRecords(recs);
         setPatientExist(true);
+        setAlert("Patient records loaded", "success");
       } else {
-        setAlert("Patient does not exist", "error");
+        setAlert("Patient not found on the network", "error");
         setPatientExist(false);
         setRecords([]);
       }
     } catch (err) {
       console.error(err);
+      setAlert("Error searching for patient", "error");
     }
   };
 
@@ -62,97 +64,93 @@ const Doctor = () => {
       setAlert("Please enter a valid wallet address", "error");
       return;
     }
+
+    if (addPatientAddress.toLowerCase() === accounts[0].toLowerCase()) {
+      setAlert("You cannot register yourself as your own patient", "error");
+      return;
+    }
+
     try {
+      // Calls the new addPatient function in EHR.sol
       await contract.methods
         .addPatient(addPatientAddress)
         .send({ from: accounts[0] });
+        
       setAlert("Patient registered successfully", "success");
       setAddPatientAddress("");
     } catch (err) {
       console.error(err);
-      setAlert("Patient registration failed", "error");
+      // This will trigger if the patient already exists or if sender is not a doctor
+      setAlert("Registration failed: Ensure patient is not already registered", "error");
     }
   };
 
-  // At the top of Doctor.jsx, change the import name for clarity
-
-
-// Inside the Doctor component:
-const addRecordCallback = useCallback(
-  async (buffer, fileName, patientAddress) => {
-    if (!patientAddress) {
-      setAlert("Please search for a patient first", "error");
-      return;
-    }
-    try {
-      // 1. Upload to Pinata and get the CID
-      const ipfsHash = await uploadToIPFS(buffer, fileName);
-      
-      if (ipfsHash) {
-        // 2. Save the CID to the Ethereum Blockchain
-        await contract.methods
-          .addRecord(ipfsHash, fileName, patientAddress)
-          .send({ from: accounts[0] });
-
-        setAlert("New record uploaded and secured on blockchain", "success");
-        setAddRecord(false);
-
-        // 3. Refresh the record list
-        const recs = await contract.methods
-          .getRecords(patientAddress)
-          .call({ from: accounts[0] });
-        setRecords(recs);
+  const addRecordCallback = useCallback(
+    async (buffer, fileName, patientAddress) => {
+      if (!patientAddress) {
+        setAlert("Please search for a patient first", "error");
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      setAlert("Record upload failed. Check console for details.", "error");
-    }
-  },
-  [accounts, contract, setAlert]
-);
+      try {
+        setAlert("Uploading to IPFS...", "info");
+        // 1. Upload to Pinata/IPFS
+        const ipfsHash = await uploadToIPFS(buffer, fileName);
+        
+        if (ipfsHash) {
+          setAlert("Securing record on Blockchain...", "info");
+          // 2. Save to Blockchain
+          await contract.methods
+            .addRecord(ipfsHash, fileName, patientAddress)
+            .send({ from: accounts[0] });
+
+          setAlert("Record secured on blockchain", "success");
+          setAddRecord(false);
+
+          // 3. Refresh list
+          const recs = await contract.methods
+            .getRecords(patientAddress)
+            .call({ from: accounts[0] });
+          setRecords(recs);
+        }
+      } catch (err) {
+        console.error(err);
+        setAlert("Failed to add record. See console for details.", "error");
+      }
+    },
+    [accounts, contract, setAlert]
+  );
 
   if (loading) {
     return (
-      <Backdrop
-        sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={loading}
-      >
+      <Backdrop sx={{ color: "#fff", zIndex: 1201 }} open={loading}>
         <CircularProgress color="inherit" />
       </Backdrop>
     );
   }
 
-  if (!accounts) {
+  // Unauthorized Access Checks
+  if (!accounts || accounts.length === 0) {
     return (
-      <Box display="flex" justifyContent="center" mt={5}>
-        <Typography variant="h6">
-          Open your MetaMask wallet to get connected, then refresh this page
-        </Typography>
+      <Box display="flex" justifyContent="center" mt={10}>
+        <Typography variant="h5">Please connect MetaMask to use the Doctor Portal</Typography>
       </Box>
     );
   }
 
-  if (role === "unknown") {
+  if (role !== "doctor") {
     return (
-      <Box display="flex" justifyContent="center" mt={5}>
-        <Typography variant="h5">
-          You're not registered, please go to home page
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (role === "patient") {
-    return (
-      <Box display="flex" justifyContent="center" mt={5}>
-        <Typography variant="h5">Only doctor can access this page</Typography>
+      <Box display="flex" flexDirection="column" alignItems="center" mt={10}>
+        <Typography variant="h4" color="error">Access Denied</Typography>
+        <Typography variant="h6">Only registered doctors can access this dashboard.</Typography>
       </Box>
     );
   }
 
   return (
     <Box display="flex" justifyContent="center" width="100vw">
-      <Box width={{ xs: "90%", sm: "60%" }} my={5}>
+      <Box width={{ xs: "95%", sm: "80%", md: "60%" }} my={5}>
+        
+        {/* Record Upload Modal */}
         <Modal open={addRecord} onClose={() => setAddRecord(false)}>
           <AddRecordModal
             handleClose={() => setAddRecord(false)}
@@ -161,68 +159,71 @@ const addRecordCallback = useCallback(
           />
         </Modal>
 
-        <Typography variant="h4" mb={2}>
-          Patient Records
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          Doctor Dashboard
+        </Typography>
+        <Typography variant="body1" color="textSecondary" mb={4}>
+          Connected as: {accounts[0]}
         </Typography>
 
-        <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} alignItems="center" gap={2} mb={2}>
-          <FormControl fullWidth>
-            <TextField
-              variant="outlined"
-              placeholder="Search patient by wallet address"
-              value={searchPatientAddress}
-              onChange={(e) => setSearchPatientAddress(e.target.value)}
-              size="small"
-              inputProps={{ style: { fontSize: 15 } }}
-            />
-          </FormControl>
+        <Divider sx={{ mb: 4 }} />
 
+        {/* Section: Patient Lookup */}
+        <Typography variant="h5" mb={2}>Find Patient Records</Typography>
+        <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} mb={4}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Enter Patient Wallet Address (0x...)"
+            value={searchPatientAddress}
+            onChange={(e) => setSearchPatientAddress(e.target.value)}
+            size="small"
+          />
           <CustomButton text="Search" handleClick={searchPatient}>
             <SearchRoundedIcon style={{ color: "white" }} />
           </CustomButton>
-
-          <CustomButton text="New Record" handleClick={() => setAddRecord(true)} disabled={!patientExist}>
+          <CustomButton 
+            text="Add Record" 
+            handleClick={() => setAddRecord(true)} 
+            disabled={!patientExist}
+          >
             <CloudUploadRoundedIcon style={{ color: "white" }} />
           </CustomButton>
         </Box>
 
-        {patientExist && records.length === 0 && (
-          <Box display="flex" justifyContent="center" my={5}>
-            <Typography variant="h5">No records found</Typography>
-          </Box>
-        )}
+        {/* Results Area */}
+        {patientExist ? (
+          records.length === 0 ? (
+            <Typography variant="h6" textAlign="center" my={4} color="textSecondary">
+              No medical records found for this patient.
+            </Typography>
+          ) : (
+            <Box display="flex" flexDirection="column" gap={2} mt={2}>
+              {records.map((record, index) => (
+                <Record key={index} record={record} />
+              ))}
+            </Box>
+          )
+        ) : null}
 
-        {patientExist && records.length > 0 && (
-          <Box display="flex" flexDirection="column" mt={3} mb={-2}>
-            {records.map((record, index) => (
-              <Box key={index} mb={2}>
-                <Record record={record} />
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        <Box mt={6} mb={4}>
-          <Divider />
+        <Box mt={6} mb={6}>
+          <Divider>
+            <Typography color="textSecondary">OR</Typography>
+          </Divider>
         </Box>
 
-        <Typography variant="h4" mb={2}>
-          Register Patient
-        </Typography>
-
-        <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} alignItems="center" gap={2}>
-          <FormControl fullWidth>
-            <TextField
-              variant="outlined"
-              placeholder="Register patient by wallet address"
-              value={addPatientAddress}
-              onChange={(e) => setAddPatientAddress(e.target.value)}
-              size="small"
-              inputProps={{ style: { fontSize: 15 } }}
-            />
-          </FormControl>
-
-          <CustomButton text="Register" handleClick={registerPatient}>
+        {/* Section: Register New Patient */}
+        <Typography variant="h5" mb={2}>Register New Patient</Typography>
+        <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="New Patient Wallet Address"
+            value={addPatientAddress}
+            onChange={(e) => setAddPatientAddress(e.target.value)}
+            size="small"
+          />
+          <CustomButton text="Register Patient" handleClick={registerPatient}>
             <PersonAddAlt1RoundedIcon style={{ color: "white" }} />
           </CustomButton>
         </Box>

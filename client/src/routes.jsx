@@ -5,7 +5,6 @@ import Home from './pages/Home';
 import Patient from './pages/patient/Patient';
 import Doctor from './pages/doctor/Doctor';
 
-// Ensure this is a standard array
 const routes = [
   {
     path: '/',
@@ -42,4 +41,4 @@ const routes = [
   },
 ];
 
-export default routes; // Make sure this is the only default export
+export default routes;

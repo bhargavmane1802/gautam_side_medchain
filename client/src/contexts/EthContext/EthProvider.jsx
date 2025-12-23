@@ -17,15 +17,18 @@ const EthProvider = ({ children }) => {
 
       let contract = null;
       let address = null;
+      let role = "unknown";
 
       if (artifact.networks[networkID]) {
         address = artifact.networks[networkID].address;
         contract = new web3.eth.Contract(abi, address);
-      }
-
-      let role = "unknown";
-      if (contract && accounts.length > 0) {
-        role = await contract.methods.getSenderRole().call({ from: accounts[0] });
+        
+        // Fetch role from the new contract logic
+        try {
+          role = await contract.methods.getSenderRole().call({ from: accounts[0] });
+        } catch (e) {
+          console.error("Could not fetch role:", e);
+        }
       }
 
       dispatch({
@@ -33,7 +36,8 @@ const EthProvider = ({ children }) => {
         data: { artifact, web3, accounts, networkID, contract, role, loading: false },
       });
     } catch (err) {
-      console.error(err);
+      console.error("Initialization error:", err);
+      dispatch({ type: actions.init, data: { loading: false } });
     }
   }, []);
 
@@ -43,7 +47,7 @@ const EthProvider = ({ children }) => {
         const artifact = await import("../../contracts/EHR.json");
         init(artifact.default || artifact);
       } catch (err) {
-        console.error(err);
+        console.error("Artifact import error:", err);
       }
     };
 
